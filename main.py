@@ -7,51 +7,67 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException
 import os
+import sys
 
-# Streamlit app URL from environment variable (or default)
-STREAMLIT_URL = os.environ.get("STREAMLIT_URL", "https://estimatework.streamlit.app/")
+# Streamlit app URLs from environment variable (comma-separated) or defaults
+STREAMLIT_URL = os.environ.get(
+    "STREAMLIT_URL",
+    "https://estimatework.streamlit.app/,https://rsicalculator.streamlit.app/"
+)
+
+STREAMLIT_URLS = [url.strip() for url in STREAMLIT_URL.split(",") if url.strip()]
+
 
 def main():
     options = Options()
-    options.add_argument('--headless=new')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--window-size=1920,1080')
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
 
     try:
-        driver.get(STREAMLIT_URL)
-        print(f"Opened {STREAMLIT_URL}")
+        for url in STREAMLIT_URLS:
+            print(f"\nOpening {url}")
+            driver.get(url)
 
-        wait = WebDriverWait(driver, 15)
-        try:
-            # Look for the wake-up button
-            button = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Yes, get this app back up')]"))
-            )
-            print("Wake-up button found. Clicking...")
-            button.click()
+            wait = WebDriverWait(driver, 15)
 
-            # After clicking, check if it disappears
             try:
-                wait.until(EC.invisibility_of_element_located((By.XPATH, "//button[contains(text(),'Yes, get this app back up')]")))
-                print("Button clicked and disappeared ✅ (app should be waking up)")
-            except TimeoutException:
-                print("Button was clicked but did NOT disappear ❌ (possible failure)")
-                exit(1)
+                button = wait.until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(text(),'Yes, get this app back up')]")
+                    )
+                )
+                print("Wake-up button found. Clicking...")
+                button.click()
 
-        except TimeoutException:
-            # No button at all → app is assumed to be awake
-            print("No wake-up button found. Assuming app is already awake ✅")
+                try:
+                    wait.until(
+                        EC.invisibility_of_element_located(
+                            (By.XPATH, "//button[contains(text(),'Yes, get this app back up')]")
+                        )
+                    )
+                    print("Button clicked and disappeared ✅ (app waking up)")
+                except TimeoutException:
+                    print("Button clicked but did not disappear ❌")
+                    sys.exit(1)
+
+            except TimeoutException:
+                print("No wake-up button found. App already awake ✅")
 
     except Exception as e:
         print(f"Unexpected error: {e}")
-        exit(1)
+        sys.exit(1)
     finally:
         driver.quit()
-        print("Script finished.")
+        print("\nScript finished.")
+
 
 if __name__ == "__main__":
     main()
